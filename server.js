@@ -13,6 +13,11 @@ let pending = [];
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
+// Serve the frontend index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.post('/upload', upload.single('image'), (req, res) => {
   const imgPath = `/uploads/${req.file.filename}`;
   pending.unshift(imgPath);
@@ -44,5 +49,5 @@ app.get('/approve', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
