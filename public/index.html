@@ -4,12 +4,260 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Museum of the Living Internet</title>
-  <!-- ... (CSS + styles remain unchanged) -->
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      scroll-behavior: smooth;
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    header h1 {
+      margin: 10px 0 0 0;
+      font-weight: 300;
+      font-size: 28px;
+    }
+    #uploadForm {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    #uploadForm button {
+      padding: 8px 16px;
+      background-color: #007BFF;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    #uploadForm button:hover {
+      background-color: #0056b3;
+    }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+      grid-gap: 2px;
+      margin: 20px auto;
+      max-width: 90%;
+    }
+    .grid-cell {
+      width: 100%;
+      padding-top: 100%;
+      position: relative;
+      border: 1px solid #ddd;
+      background-color: white;
+      overflow: hidden;
+      animation: fadeIn 0.5s ease forwards;
+    }
+    .grid-cell img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    #alertBox {
+      display: none;
+      margin: 10px;
+      font-weight: bold;
+      transition: opacity 0.5s;
+    }
+    #pendingList {
+      margin-top: 20px;
+    }
+    #scrollTopBtn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      padding: 12px 18px;
+      font-size: 18px;
+      background: rgba(255, 255, 255, 0.7);
+      color: #007BFF;
+      border: 1px solid #007BFF;
+      border-radius: 50%;
+      cursor: pointer;
+      display: none;
+      backdrop-filter: blur(5px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      transition: background 0.3s, transform 0.3s;
+      z-index: 1000;
+    }
+    #scrollTopBtn:hover {
+      background: rgba(255, 255, 255, 0.9);
+      transform: scale(1.1);
+    }
+    #spinner {
+      display: none;
+      margin: 30px auto;
+      width: 40px;
+      height: 40px;
+      border: 5px dashed #007BFF;
+      border-radius: 50%;
+      animation: spin 1.2s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @media (max-width: 600px) {
+      header h1 {
+        font-size: 22px;
+      }
+      #uploadForm button {
+        font-size: 12px;
+        padding: 6px 12px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <!-- (Body content including header, upload form, alert box, spinner, grid, scroll button) -->
+
+  <header>
+    <form id="uploadForm" enctype="multipart/form-data">
+      <input type="file" id="imageInput" name="image" accept="image/*" required>
+      <button type="submit">Upload</button>
+    </form>
+    <h1>Museum of the Living Internet</h1>
+  </header>
+
+  <div id="alertBox"></div>
+  <div id="spinner"></div>
+  <div id="pendingList"></div>
+  <div id="grid"></div>
+  <button id="scrollTopBtn" onclick="scrollToTop()">↑</button>
+
   <script>
-    // (Full JavaScript for uploading, grid rendering, scroll to top, lazy loading, etc.)
+    const gridContainer = document.getElementById('grid');
+    const uploadForm = document.getElementById('uploadForm');
+    const imageInput = document.getElementById('imageInput');
+    const pendingList = document.getElementById('pendingList');
+    const alertBox = document.getElementById('alertBox');
+    const scrollTopBtn = document.getElementById('scrollTopBtn');
+    const spinner = document.getElementById('spinner');
+
+    let approvedImages = [];
+    let pendingImages = [];
+    let page = 0;
+
+    async function fetchApprovedImages() {
+      const res = await fetch(`/approved?page=${page}`);
+      const images = await res.json();
+      approvedImages = approvedImages.concat(images);
+      renderGrid();
+    }
+
+    async function fetchPendingImages() {
+      const res = await fetch('/pending');
+      pendingImages = await res.json();
+      renderPending();
+    }
+
+    function renderGrid() {
+      gridContainer.innerHTML = '';
+      approvedImages.forEach(imgPath => {
+        const div = document.createElement('div');
+        div.className = 'grid-cell';
+        const img = document.createElement('img');
+        img.src = imgPath;
+        div.appendChild(img);
+        gridContainer.appendChild(div);
+      });
+    }
+
+    function renderPending() {
+      pendingList.innerHTML = '';
+      pendingImages.forEach((imgPath, index) => {
+        const div = document.createElement('div');
+        div.style.marginBottom = '10px';
+        const img = document.createElement('img');
+        img.src = imgPath;
+        img.style.width = '100px';
+        img.style.height = '100px';
+        img.style.objectFit = 'cover';
+        const approveBtn = document.createElement('button');
+        approveBtn.textContent = 'Approve';
+        approveBtn.onclick = async () => {
+          await fetch(`/approve?image=${encodeURIComponent(imgPath)}`);
+          pendingImages.splice(index, 1);
+          approvedImages.unshift(imgPath);
+          renderPending();
+          renderGrid();
+        };
+        div.appendChild(img);
+        div.appendChild(approveBtn);
+        pendingList.appendChild(div);
+      });
+    }
+
+    function showAlert(message, isError = true) {
+      alertBox.style.display = 'block';
+      alertBox.style.color = isError ? 'red' : 'green';
+      alertBox.textContent = message;
+      setTimeout(() => {
+        alertBox.style.opacity = '0';
+        setTimeout(() => {
+          alertBox.style.display = 'none';
+          alertBox.style.opacity = '1';
+        }, 500);
+      }, 3000);
+    }
+
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(uploadForm);
+      spinner.style.display = 'block';
+      try {
+        const res = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+        spinner.style.display = 'none';
+        if (!res.ok) {
+          const errorText = await res.text();
+          showAlert(errorText, true);
+        } else {
+          await fetchPendingImages();
+          showAlert('Upload successful! Awaiting approval.', false);
+          uploadForm.reset();
+        }
+      } catch (err) {
+        spinner.style.display = 'none';
+        showAlert('Error uploading image.', true);
+      }
+    });
+
+    window.addEventListener('scroll', () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
+        page++;
+        fetchApprovedImages();
+      }
+      scrollTopBtn.style.display = window.scrollY > 300 ? 'block' : 'none';
+    });
+
+    function scrollToTop() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    fetchApprovedImages();
+    fetchPendingImages();
   </script>
+
 </body>
 </html>
